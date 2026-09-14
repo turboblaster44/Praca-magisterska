@@ -1,0 +1,63 @@
+__pycache__/
+*.py[cod]
+/data/*
+!data/structured.csv
+/.venv
+requirements.txt
+
+/testing/output
+
+statistics/**/*.png
+statistics/**/*.csv
+statistics/**/*.txt
+
+/stat_output
+
+test_data/*
+!test_data/structured.csv
+
+visualization/*.csv
+_PRACA/
+
+
+
+prev_runs/*
+!prev_runs/Holistic final/
+!prev_runs/Holistic final/*
+!prev_runs/Pipeline final/
+!prev_runs/Pipeline final/*
+temp*/
+
+# LaTeX build artefacts (source stays: .tex, .bib, figures/)
+*.aux
+*.log
+*.out
+*.toc
+*.lof
+*.lot
+*.bbl
+*.blg
+*.bcf
+*.run.xml
+*.synctex.gz
+*.fls
+*.fdb_latexmk
+*.nav
+*.snm
+*.vrb
+*.idx
+*.ilg
+*.ind
+*.glo
+*.gls
+*.acn
+*.acr
+*.alg
+*.xdv
+_PRACA/Magisterka_LATEX/main.pdf
+
+
+# gold standards
+# docs/gold
+COMPARE/
+.claude/settings.local.json
