@@ -20,6 +20,7 @@ visualization/*.csv
 _PRACA/
 
 
+.env
 
 prev_runs/*
 !prev_runs/Holistic final/
