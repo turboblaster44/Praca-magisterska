@@ -34,6 +34,12 @@ graph import and `graphviz` for the dependency-graph figure. It then pre-downloa
 MarianMT translation model, BioLinkBERT and the scispaCy UMLS knowledge base (about
 1 GB), and freezes the result into `requirements.txt`.
 
+Expect this to take a while. The script is download-bound rather than CPU-bound — torch,
+the three transformer models and the UMLS knowledge base are several GB between them, and
+the knowledge base step in particular looks like it has hung when it is simply fetching.
+It is a one-off cost: pip and Hugging Face both cache, so re-running the script after a
+failure resumes quickly rather than starting over.
+
 The one thing pip cannot supply is the Graphviz binaries that the Python `graphviz`
 wrapper renders through. Install those from [graphviz.org](https://graphviz.org/download/)
 if you need `testing/dep_tree_figure.py`; nothing else in the pipeline touches them.

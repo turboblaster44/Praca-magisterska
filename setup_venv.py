@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
-import os
 import subprocess
 import sys
+import os
 from config import MARIANMT_MODEL_PL_EN, BIOLINK_BERT_MODEL, SPACY_MODEL_ENGLISH
 
 # -------------------------------
@@ -42,8 +42,7 @@ run([python_bin, "-m", "pip", "install", "--upgrade", "pip"])
 # -------------------------------
 run([pip_bin, "install", "pydantic>=2.10.1,<3.0.0"])
 run([pip_bin, "install", "typer>=0.16.0,<0.22.0"])
-run([pip_bin, "install", "spacy>=3.7.0,<3.9.0"])
-
+run([pip_bin, "install", "spacy==3.7.5"])
 # -------------------------------
 # 4️⃣ Install SciSpacy + medSpaCy (clinical NLP layers on top of spaCy)
 # -------------------------------
@@ -58,6 +57,25 @@ SCISPACY_SCI_MODEL_URL = (
     "v0.5.4/en_core_sci_md-0.5.4.tar.gz"
 )
 run([pip_bin, "install", "--no-deps", SCISPACY_SCI_MODEL_URL])
+
+# The published 0.5.4 model stores booleans as strings. spaCy 3.8, selected
+# by medSpaCy on Python 3.12, rejects those values during model loading.
+if sys.version_info >= (3, 12):
+    run([
+        python_bin,
+        "-c",
+        """
+from pathlib import Path
+import en_core_sci_md
+
+config_path = next(Path(en_core_sci_md.__file__).parent.rglob("config.cfg"))
+config = config_path.read_text()
+config_path.write_text(config.replace(
+    'include_static_vectors = "True"',
+    "include_static_vectors = true",
+))
+""",
+    ])
 
 # Pre-download the UMLS knowledge base for the scispacy EntityLinker (~1 GB).
 # There is no pip package for the KB — instantiating the linker once is the
