@@ -3,6 +3,10 @@
 ```bash
 python .\scripts\wipe_neo4j.py
 ```
+```bash
+python .\orchestrator.py
+```
+
 
 ```bash
 python .\scripts\load_run.py "DEMO_HOLISTIC"
