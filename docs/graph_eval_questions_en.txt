@@ -1,0 +1,10 @@
+1. How many reports carry both a past, completed procedure and a currently active, confirmed condition?
+2. Which past procedures occur most often across the corpus, aggregated through the shared concept layer?
+3. What share of all recorded diagnoses is only provisional rather than confirmed?
+4. In how many reports did a diagnostic act reveal a finding that remains only suspected?
+5. To which organisational units are patients referred, and how many referrals go to each?
+6. At which anatomical sites does the corpus describe malignant findings, and how many of those are past rather than current disease?
+7. Which medications carry an explicit numeric dose in milligrams, and what is the dose distribution?
+8. Which treatments are applied to which diseases, aggregated across patients?
+9. Which anatomical structures are operated on or examined most often, and which of those procedures are past rather than current?
+10. How many findings carry an explicit severity grading, and how is it distributed?
