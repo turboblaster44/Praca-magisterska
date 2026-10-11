@@ -543,6 +543,10 @@ def run_full_import(
         print(f"[neo4j] Connected to {uri}")
 
         with driver.session(database=database) as session:
+            if wipe:
+                session.run("MATCH (n) DETACH DELETE n")
+                print("[neo4j] Wiped database (DETACH DELETE)")
+
             # Import nodes
             nodes_df = load_csv_safe(nodes_csv)
             nodes_url = Path(nodes_csv).resolve().as_uri()

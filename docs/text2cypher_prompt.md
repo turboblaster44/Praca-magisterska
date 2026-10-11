@@ -28,6 +28,17 @@ resource type: (:Condition) (:Observation) (:Procedure) (:MedicationStatement)
   (:BodyStructure) is an anatomical structure of THIS patient (reach it from a fact
   via [:LOCATED_IN] [:PERFORMED_ON] [:AFFECTS]); (:Location) is a place of care
   ("cardiology clinic"); (:Encounter) is an admission, visit or referral.
+  Which label a mention gets is decided by its NER category, and two of those differ
+  from everyday FHIR practice — follow THIS mapping, not the habit:
+    (:Condition)  diseases/disorders AND signs & symptoms. A cough, pain, swelling,
+                  fever or nausea is a (:Condition), NEVER an (:Observation).
+    (:Observation) only a measured or reported VALUE: lab values, scores and grades,
+                  outcomes, activities. Also the fallback for unmapped entity types.
+    (:Procedure)  BOTH diagnostic and therapeutic — a CT scan and chemotherapy are
+                  both (:Procedure).
+    (:MedicationStatement) only a named drug.
+  So "patients with disease X who report symptom Y" matches (:Condition) TWICE,
+  joined on the same (:Patient) — not (:Condition) plus (:Observation).
   A ward or clinic named after a disease ("Hypertension Clinic", "Department of
   Arterial Hypertension and Diabetology") is a (:Location), NOT a (:Condition) —
   it says where the patient was seen, never that the patient has that disease.
@@ -90,6 +101,19 @@ anatomical edges into (:BodyStructure): [:LOCATED_IN] [:PERFORMED_ON] [:AFFECTS]
 - Present facts by DEFAULT: add WHERE fact.verificationStatus = 'confirmed'. Include
   negated/uncertain/family/historical ONLY if the question explicitly asks about
   absent / possible / family-history / past findings.
+- When the question DOES ask about an absent/possible finding, DROP that default
+  filter — do not combine it with the assertion test. verificationStatus is DERIVED
+  from assertion (negated -> 'refuted', uncertain -> 'provisional', else 'confirmed'),
+  so `verificationStatus = 'confirmed' AND assertion CONTAINS 'negated'` is a
+  contradiction that silently returns zero rows. For absence use
+  `verificationStatus = 'refuted'` alone; for uncertainty use 'provisional'.
+- Do not make a SECONDARY detail a mandatory MATCH. If the question's main subject is
+  one thing (a finding) and it also asks for something else (treatment, site, date),
+  attach that second part with OPTIONAL MATCH — a hard MATCH on a label the graph
+  happens not to contain, such as (:MedicationStatement) in a graph whose only
+  treatment is a (:Procedure), turns the whole answer empty. When "treatment" is meant
+  generically, match both: OPTIONAL MATCH (t)-[:SUBJECT]->(p) WHERE t:Procedure OR
+  t:MedicationStatement.
 - Patients relate to a disease via (:Condition)-[:HAS_CODE]->(:Concept) and
   (:Condition)-[:SUBJECT]->(:Patient). Aggregate/count across patients on the shared Concept.
 - FAMILY HISTORY is a separate label: a relative's finding is a (:FamilyMemberHistory)

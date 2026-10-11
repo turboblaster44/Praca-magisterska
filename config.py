@@ -167,7 +167,7 @@ GRAPH_RELATION_THRESHOLD = 0.5
 #               CUI stays a CodeableConcept (:Concept) node, provenance rides as
 #               source_id+offsets on the fact. Built from ner_results + re_results.
 # ---------------------------------------------------------------------------
-GRAPH_MODE = "concept"
+GRAPH_MODE = "fhir"
 
 # Demographic entities → properties on :Patient (never their own nodes / facts).
 # Property name = label lower-cased (AGE→age, SEX→sex, ...).
@@ -303,7 +303,7 @@ DATA_FORMAT = "csv"  # or "csv"
 # Data file paths
 INPUT_TXT          = f"{DATA_DIR}/data.txt"
 INPUT_CSV          = f"{DATA_DIR}/corpus_summary_all.csv"
-STRUCTURED_CSV     = f"{DATA_DIR}/structured.csv"
+STRUCTURED_CSV     = f"{DATA_DIR}/structured_demo.csv"
 NER_OUTPUT_CSV     = f"{DATA_DIR}/ner_results.csv"
 NER_RAW_OUTPUT_CSV = f"{DATA_DIR}/ner_results_raw.csv"  # pre-dedup, both methods kept
 RE_OUTPUT_CSV      = f"{DATA_DIR}/re_results.csv"

@@ -10,10 +10,11 @@ Usage:
     python -m testing.test_sentence "..." --no-context        # skip ConText
     python -m testing.test_sentence "..." --no-biolink --no-spacy  # NER only
     python -m testing.test_sentence "..." --no-neural         # gazetteer only
+    python -m testing.test_sentence "..." --no-llm            # without the LLM peers
 
 Toggles mirror orchestrator STEPS:
-    --no-neural --no-gazetteer --no-context --no-umls   (NER methods / enrichers)
-    --no-biolink --no-spacy                             (RE methods)
+    --no-neural --no-gazetteer --no-llm --no-context --no-umls  (NER methods / enrichers)
+    --no-biolink --no-spacy --no-llm                            (RE methods)
     --no-fhir                                           (skip FHIR graph mapping)
 """
 
@@ -54,6 +55,77 @@ def _flag_markers(row) -> str:
     }
     on = [m for col, m in marks.items() if col in row and bool(row[col])]
     return ",".join(on) if on else "-"
+
+
+def _span(row) -> str:
+    """`start-end` as plain integers, or `-` when a method left no offsets."""
+    if pd.isna(row.get("start")) or pd.isna(row.get("end")):
+        return "-"
+    return f"{int(row['start'])}-{int(row['end'])}"
+
+
+def _ner_key(row) -> tuple:
+    """Identity of one raw mention — a kept row IS one of the raw rows."""
+    return (str(row["word"]), str(row["label"]), str(row["method"]), _span(row))
+
+
+def _re_key(row) -> tuple:
+    return (str(row["entity1"]), str(row["relation"]),
+            str(row["entity2"]), str(row["method"]))
+
+
+def _counts(df: pd.DataFrame) -> str:
+    return ", ".join(f"{m} {n}" for m, n in df["method"].value_counts().items())
+
+
+def print_ner_raw(df_raw: pd.DataFrame, df_kept: pd.DataFrame) -> None:
+    """Every mention every method proposed, before the merge.
+
+    This is the method comparison: `<-- kept` marks the row that survived the
+    score cutoff, the overlap resolution and the dedup. A row without it lost to
+    a higher-priority method on the same span, or to a longer span covering the
+    same stretch of text — which is the interesting case, since the methods
+    disagree about where an entity starts and ends as often as about its label.
+    """
+    print("\n" + "=" * 70)
+    print("STEP 1a - every mention, every method (before the merge)")
+    print("=" * 70)
+    if df_raw is None or df_raw.empty:
+        print("  (no mentions)")
+        return
+
+    print(f"  {len(df_raw)} mentions ({_counts(df_raw)})  ->  {len(df_kept)} after the merge")
+    kept = {_ner_key(r) for _, r in df_kept.iterrows()}
+    print(f"\n  {'span':<9}{'entity':<26}{'label':<23}{'method':<11}score")
+    print("  " + "-" * 68)
+    for _, r in df_raw.sort_values(["start", "method"], kind="stable").iterrows():
+        mark = "  <-- kept" if _ner_key(r) in kept else ""
+        print(f"  {_span(r):<9}{str(r['word'])[:25]:<26}{str(r['label'])[:22]:<23}"
+              f"{str(r['method'])[:10]:<11}{float(r['score']):.3f}{mark}")
+
+
+def print_re_raw(df_raw: pd.DataFrame, df_kept: pd.DataFrame) -> None:
+    """Every relation every method proposed, before the merge.
+
+    Unlike NER, the LLM is ranked LAST here, so the kept rows really do mix
+    methods — and the same pair can keep two different labels when two methods
+    read it differently.
+    """
+    print("\n" + "=" * 70)
+    print("STEP 2a - every relation, every method (before the merge)")
+    print("=" * 70)
+    if df_raw is None or df_raw.empty:
+        print("  (no relations)")
+        return
+
+    print(f"  {len(df_raw)} relations ({_counts(df_raw)})  ->  {len(df_kept)} after the merge")
+    kept = {_re_key(r) for _, r in df_kept.iterrows()}
+    print()
+    for _, r in df_raw.sort_values(["entity1", "relation"], kind="stable").iterrows():
+        mark = "  <-- kept" if _re_key(r) in kept else ""
+        print(f"  {str(r['entity1'])[:24]:<25}--{str(r['relation'])[:18]:<19}-->  "
+              f"{str(r['entity2'])[:24]:<25}{float(r['score']):.3f}  "
+              f"{str(r['method'])[:16]:<17}{mark}")
 
 
 def print_ner(df_ner: pd.DataFrame) -> None:
@@ -189,8 +261,8 @@ def main(argv=None) -> None:
     parser.add_argument("--no-biolink", action="store_true")
     parser.add_argument("--no-spacy", action="store_true")
     parser.add_argument("--no-fhir", action="store_true")
-    parser.add_argument("--llm", action="store_true",
-                        help="Enable the opt-in LLM NER + RE methods (needs an API key).")
+    parser.add_argument("--no-llm", action="store_true",
+                        help="Skip the LLM NER + RE peer methods (they need an API key).")
     parser.add_argument("--holistic", action="store_true",
                         help="Holistic variant: one LLM step for entities + relations "
                              "(replaces NER+RE; needs an API key).")
@@ -214,25 +286,27 @@ def main(argv=None) -> None:
             use_context=not args.no_context,
             use_umls=not args.no_umls,
         )
+        # One method, so raw == deduped: nothing to compare, nothing to show.
+        df_ner_raw = df_rel_raw = None
     else:
         # --- NER (+ ConText) ---
-        df_ner, _ = ner_tasks.run(
+        df_ner, df_ner_raw = ner_tasks.run(
             df_structured,
             use_neural=not args.no_neural,
             use_gazetteer=not args.no_gazetteer,
-            use_llm=args.llm,
+            use_llm=not args.no_llm,
             use_context=not args.no_context,
             use_umls=not args.no_umls,
         )
 
         # --- RE (+ assertion annotation) ---
-        df_rel, _ = re_tasks.run(
+        df_rel, df_rel_raw = re_tasks.run(
             df_ner,
             df_structured,
             biolink_model_name=config.BIOLINK_BERT_MODEL,
             use_biolink=not args.no_biolink,
             use_spacy=not args.no_spacy,
-            use_llm=args.llm,
+            use_llm=not args.no_llm,
         )
 
     # --- Save ---
@@ -241,9 +315,13 @@ def main(argv=None) -> None:
     df_ner.to_csv(ner_csv, index=False, encoding="utf-8", quoting=csv.QUOTE_ALL)
     df_rel.to_csv(re_csv, index=False, encoding="utf-8", quoting=csv.QUOTE_ALL)
 
-    # --- Report ---
+    # --- Report: what every method proposed, then what survived the merge ---
+    if df_ner_raw is not None:
+        print_ner_raw(df_ner_raw, df_ner)
     print_ner(df_ner)
     print_umls(df_ner)
+    if df_rel_raw is not None:
+        print_re_raw(df_rel_raw, df_rel)
     print_re(df_rel)
 
     # --- FHIR graph mapping (reads the CSVs just written) ---

@@ -103,6 +103,49 @@ python -m testing.test_sentence "CT revealed a mass in the left lung."
 python -m testing.test_sentence --holistic "..."
 ```
 
+For a demo of the whole thing — three records in, a Neo4j graph out —
+[testing/demo_graph.py](testing/demo_graph.py) runs the same code paths as
+`orchestrator.py` over a three-record corpus and loads the resulting graph into Neo4j.
+Per record it prints what every method proposed before the merge (with the row that won
+marked), then the entities that survived it, their assertion flags and UMLS codes, and
+the relations.
+Both committed corpora deliberately share concepts across their records, one of them
+negated in one record and affirmed in another, so the graph is connected and the
+`WHAT JOINS THE RECORDS` section names what connects it.
+
+```powershell
+python -m testing.demo_graph                              # holistic, then load into Neo4j
+python -m testing.demo_graph --mode pipeline              # modular NER + RE
+python -m testing.demo_graph --mode both                  # run both variants, load neither
+python -m testing.demo_graph --mode holistic --load-only  # re-import saved CSVs, no extraction
+python -m testing.demo_graph --mode pipeline --no-neo4j   # stop at the graph CSVs
+```
+
+Which corpus it runs on is the `CORPUS_CSV` constant at the top of the script — edit that
+line to switch. Three are committed, smallest first:
+
+| Corpus | Records | Graph | What it shows |
+| ------ | ------- | ----- | ------------- |
+| [demo_corpus_one.csv](testing/demo_corpus_one.csv) | 1 sentence | 1 patient, 4 facts, 4 concepts, 14 edges | one sentence end to end: every step on a single screen |
+| [demo_corpus_simple.csv](testing/demo_corpus_simple.csv) | 3 one-line | 3 patients, 9 facts, 5 concepts, 22 edges | all three mention lung cancer, so one `:Concept` joins every patient; `lymph nodes` and `cough` are affirmed in one record and negated in another |
+| [demo_corpus.csv](testing/demo_corpus.csv) | 3 multi-sentence | 3 patients, 25 facts, 27 concepts, 69 edges | exercises the ontology: family history, historical procedures, measurements, uncertainty |
+
+Output goes to `testing/output/<corpus name>_<mode>/`, so switching corpora never
+overwrites an earlier run and `--load-only` stays unambiguous.
+
+`scripts/wipe_neo4j.py` empties the database and does nothing else, for when you want a
+blank graph without importing anything on top of it. (`demo_graph` already wipes before
+every import, and `visualization/neo4j_integration.py --wipe` wipes then imports.)
+
+Every method is on and the graph model is whatever `GRAPH_MODE` says, so a demo run
+matches what the thesis measured; the only switch is the extraction variant. Each run
+wipes the database first, so the graph on screen is only those three records — which is
+why the two variants are loaded one at a time. Output never lands in `data/` or
+`visualization/`. `--load-only`
+re-imports the CSVs an earlier run wrote without re-extracting, so switching the graph in
+front of an audience costs a second rather than the minutes the modular path spends
+loading its models.
+
 ## Configuration
 
 [config.py](config.py) holds the model names, every score cutoff and the data paths.
@@ -176,6 +219,11 @@ a `run_info.txt` listing what passed and how long it took.
 the NER/RE CSVs and the graph CSVs into `prev_runs/<run name>/`. `.gitignore` keeps
 that directory out of version control except for the run names listed there
 explicitly, so archiving a run does not commit tens of megabytes by accident.
+
+`scripts/load_run.py` is the way back: with no argument it lists what is in `prev_runs/`
+and which `GRAPH_MODE` each archived run can be loaded in; given a run name it wipes the
+database and imports that run's graph CSVs, so an old run can be queried again without
+re-extracting anything.
 
 ## Repository layout
 
